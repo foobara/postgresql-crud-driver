@@ -134,6 +134,14 @@ module Foobara
         raw_connection.exec(sql)
       end
 
+      def hard_delete_all
+        sql = <<~SQL
+          DELETE FROM #{PostgresqlCrudDriver.escape_identifier(table_name)}
+        SQL
+
+        raw_connection.exec(sql)
+      end
+
       private
 
       def normalize_attribute(attribute_name, value)

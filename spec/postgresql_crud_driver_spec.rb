@@ -1,6 +1,5 @@
 RSpec.describe Foobara::PostgresqlCrudDriver do
   let(:crud_driver) { described_class.new }
-
   let(:setup_connection) do
     PG::Connection.new("postgres://#{db_user}:#{db_password}@localhost:5432/postgres")
   end
@@ -23,6 +22,10 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
   let(:credentials) { nil }
   let(:database_url) do
     "postgres://#{db_user}:#{db_password}@localhost:5432/#{db_name}"
+  end
+
+  def table
+    entity_class.current_transaction_table.entity_attributes_crud_driver_table
   end
 
   after do
@@ -174,6 +177,23 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
       }.to change {
         entity_class.transaction { entity_class.count }
       }.from(2).to(1)
+    end
+  end
+
+  describe "#hard_delete_all" do
+    it "deletes all records" do
+      entity_class.transaction do
+        entity_class.create(foo: 1, bar: :foo)
+        entity_class.create(foo: 2, bar: :baz)
+      end
+
+      expect {
+        entity_class.transaction do
+          table.hard_delete_all
+        end
+      }.to change {
+        entity_class.transaction { entity_class.count }
+      }.from(2).to(0)
     end
   end
 end
