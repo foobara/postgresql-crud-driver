@@ -43,6 +43,48 @@ module Foobara
     end
 
     class Table < Persistence::EntityAttributesCrudDriver::Table
+      def all(page_size: nil)
+        Enumerator.new do |yielder|
+          after = nil
+
+          loop do
+            page = fetch_page(after:, page_size:)
+
+            break if page.empty?
+
+            page.each do |record|
+              yielder << record
+            end
+
+            after = page.last[entity_class.primary_key_attribute.to_s]
+          end
+        end.lazy
+      end
+
+      def fetch_page(after: nil, page_size: nil, order_by: entity_class.primary_key_attribute)
+        page_size ||= 100
+
+        column, value = normalize_attribute(order_by, after)
+
+        sql = <<~SQL
+          SELECT *
+          FROM #{PostgresqlCrudDriver.escape_identifier(table_name)}
+        SQL
+
+        if after
+          sql += " WHERE #{column} > #{value} "
+        end
+
+        sql += <<~SQL
+          ORDER BY #{column}
+          LIMIT #{page_size}
+        SQL
+
+        result_data = raw_connection.exec(sql)
+
+        result_data.to_a
+      end
+
       def insert(attributes)
         columns = []
         values = []

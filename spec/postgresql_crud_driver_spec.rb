@@ -196,4 +196,20 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
       }.from(2).to(0)
     end
   end
+
+  describe "#all" do
+    it "yields all records" do
+      entity_class.transaction do
+        111.times do
+          entity_class.create(foo: 1, bar: :foo)
+        end
+      end
+
+      entity_class.transaction do
+        expect(table.all.to_a.size).to eq(111)
+        expect(table.all(page_size: 10).to_a.size).to eq(111)
+        expect(entity_class.all.first.foo).to eq(1)
+      end
+    end
+  end
 end
