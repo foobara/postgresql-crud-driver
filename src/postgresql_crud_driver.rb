@@ -77,6 +77,18 @@ module Foobara
         raw_connection.exec(sql).first["count"].to_i
       end
 
+      def find(record_id)
+        column, value = normalize_attribute(entity_class.primary_key_attribute, record_id)
+
+        sql = <<~SQL
+          SELECT *
+          FROM #{PostgresqlCrudDriver.escape_identifier(table_name)}
+          WHERE #{column} = #{value}
+        SQL
+
+        raw_connection.exec(sql).first
+      end
+
       private
 
       def normalize_attribute(attribute_name, value)
@@ -95,6 +107,15 @@ module Foobara
                 elsif foobara_type.extends?(:string) || foobara_type.extends?(:symbol)
                   case pg_type
                   when "text"
+                    "'#{value}'"
+                  else
+                    # :nocov:
+                    raise UnsupportedPgColumnTypeError.new(pg_type, attribute_name, entity_class)
+                    # :nocov:
+                  end
+                elsif foobara_type.extends?(:datetime)
+                  case pg_type
+                  when "timestamp without time zone"
                     "'#{value}'"
                   else
                     # :nocov:

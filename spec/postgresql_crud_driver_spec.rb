@@ -10,11 +10,12 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
   let(:db_password) { "testpassword" }
   let(:entity_class) do
     stub_class("SomeEntity", Foobara::Entity) do
-      attributes id: :integer,
-                 foo: :integer,
-                 bar: :symbol,
-                 created_at: :datetime
-
+      attributes do
+        id :integer
+        foo :integer
+        bar :symbol
+        created_at :datetime, default: -> { Time.now }
+      end
       primary_key :id
     end
   end
@@ -108,6 +109,28 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
       }.to change {
         entity_class.transaction { entity_class.count }
       }.from(0).to(1)
+    end
+  end
+
+  describe "#find" do
+    it "can find a record" do
+      created_record = entity_class.transaction do
+        entity_class.create(foo: 1, bar: :foo)
+      end
+
+      record_id = created_record.id
+
+      entity_class.transaction do |tx|
+        attributes = tx.table_for(entity_class).entity_attributes_crud_driver_table.find(record_id)
+        expect(attributes["foo"]).to eq("1")
+        record = entity_class.load(record_id)
+
+        expect(record).to be_a(entity_class)
+        expect(record.id).to eq(record_id)
+        expect(record.foo).to eq(1)
+        expect(record.bar).to eq(:foo)
+        expect(record.created_at).to be_a(Time)
+      end
     end
   end
 end
