@@ -117,6 +117,23 @@ module Foobara
         find(record_id)
       end
 
+      def hard_delete(record_id)
+        unless exists?(record_id)
+          # :nocov:
+          raise CannotDeleteError.new(record_id, "does not exist")
+          # :nocov:
+        end
+
+        primary_key, record_id = normalize_attribute(entity_class.primary_key_attribute, record_id)
+
+        sql = <<~SQL
+          DELETE FROM #{PostgresqlCrudDriver.escape_identifier(table_name)}
+          WHERE #{primary_key} = #{record_id}
+        SQL
+
+        raw_connection.exec(sql)
+      end
+
       private
 
       def normalize_attribute(attribute_name, value)

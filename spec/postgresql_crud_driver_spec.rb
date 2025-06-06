@@ -156,4 +156,24 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
       expect(record.foo).to eq(2)
     end
   end
+
+  describe "#hard_delete" do
+    it "can delete a record" do
+      created_record = entity_class.transaction do
+        entity_class.create(foo: 1, bar: :foo)
+        entity_class.create(foo: 2, bar: :baz)
+      end
+
+      record_id = created_record.id
+
+      expect {
+        entity_class.transaction do
+          record = entity_class.load(record_id)
+          record.hard_delete!
+        end
+      }.to change {
+        entity_class.transaction { entity_class.count }
+      }.from(2).to(1)
+    end
+  end
 end
