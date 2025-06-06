@@ -106,7 +106,7 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
           entity_class.create(foo: 1, bar: :foo)
         end
       }.to change {
-        pg.exec("SELECT COUNT(*) FROM some_entity").first["count"].to_i
+        entity_class.transaction { entity_class.count }
       }.from(0).to(1)
     end
   end

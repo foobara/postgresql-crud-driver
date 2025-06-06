@@ -68,6 +68,17 @@ module Foobara
         )
       end
 
+      def count
+        sql = <<~SQL
+          SELECT COUNT(*)
+          FROM #{PostgresqlCrudDriver.escape_identifier(table_name)}
+        SQL
+
+        raw_connection.exec(sql).first["count"].to_i
+      end
+
+      private
+
       def normalize_attribute(attribute_name, value)
         pg_type = column_types[attribute_name.to_s]
         foobara_type = entity_class.model_type.element_types.element_types[attribute_name]
