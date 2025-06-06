@@ -93,6 +93,8 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
     context "with a database url" do
       let(:crud_driver) { described_class.new(database_url) }
 
+      after { crud_driver.raw_connection.close }
+
       it "connects to the database" do
         expect(crud_driver.raw_connection).to be_a(PG::Connection)
         expect(crud_driver.raw_connection.host).to eq("localhost")
@@ -131,6 +133,27 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
         expect(record.bar).to eq(:foo)
         expect(record.created_at).to be_a(Time)
       end
+    end
+  end
+
+  describe "#update" do
+    it "can update a record" do
+      created_record = entity_class.transaction do
+        entity_class.create(foo: 1, bar: :foo)
+      end
+
+      record_id = created_record.id
+
+      entity_class.transaction do
+        record = entity_class.load(record_id)
+        record.foo = 2
+      end
+
+      record = entity_class.transaction do
+        entity_class.load(record_id)
+      end
+
+      expect(record.foo).to eq(2)
     end
   end
 end

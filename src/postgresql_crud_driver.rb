@@ -62,10 +62,9 @@ module Foobara
         SQL
 
         record_data = raw_connection.exec(sql)
+        record_id = record_data.first[entity_class.primary_key_attribute.to_s]
 
-        attributes.merge(
-          entity_class.primary_key_attribute => record_data.first[entity_class.primary_key_attribute.to_s]
-        )
+        find(record_id)
       end
 
       def count
@@ -87,6 +86,35 @@ module Foobara
         SQL
 
         raw_connection.exec(sql).first
+      end
+
+      def update(attributes)
+        record_id = record_id_for(attributes)
+
+        unless exists?(record_id)
+          # :nocov:
+          raise CannotUpdateError.new(record_id, "does not exist")
+          # :nocov:
+        end
+
+        set_expressions = []
+
+        attributes.each_pair do |attribute_name, value|
+          column_name, value = normalize_attribute(attribute_name, value)
+
+          set_expressions << "#{column_name} = #{value}"
+        end
+
+        primary_key, record_id = normalize_attribute(entity_class.primary_key_attribute, record_id)
+
+        sql = <<~SQL
+          UPDATE #{PostgresqlCrudDriver.escape_identifier(table_name)}
+          SET #{set_expressions.join(", ")}
+          WHERE #{primary_key} = #{record_id}
+        SQL
+
+        raw_connection.exec(sql)
+        find(record_id)
       end
 
       private
