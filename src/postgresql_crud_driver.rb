@@ -1,3 +1,5 @@
+require "connection_pool"
+
 module Foobara
   class PostgresqlCrudDriver < Persistence::EntityAttributesCrudDriver
     class NoDatabaseUrlError < StandardError; end
@@ -11,15 +13,8 @@ module Foobara
     end
 
     class << self
-      attr_writer :pg
-
-      def pg
-        @pg ||= if ENV["DATABASE_URL"]
-                  PG.connect(ENV["DATABASE_URL"])
-                else
-                  raise NoDatabaseUrlError,
-                        'Must set ENV["DATABASE_URL"] if trying to initialize PostgresqlCrudDriver with no arguments'
-                end
+      def has_real_transactions?
+        true
       end
 
       def escape_identifier(identifier)
@@ -31,15 +26,57 @@ module Foobara
       end
     end
 
-    def open_connection(connection_url_or_credentials)
-      case connection_url_or_credentials
-      when PG::Connection
-        connection_url_or_credentials
-      when ::String, ::Hash
-        PG.connect(connection_url_or_credentials)
-      when nil
-        self.class.pg
-      end
+    attr_accessor :creds
+
+    # We intentionally don't call super because super would open a connection which we do not want
+    # since we want one connection per transaction.
+    # rubocop:disable Lint/MissingSuper
+    def initialize(connection_or_credentials = nil)
+      self.tables = {}
+      self.creds = case connection_or_credentials
+                   when ::String, ::Hash
+                     connection_or_credentials
+                   when nil
+                     ENV["DATABASE_URL"] || raise(NoDatabaseUrlError,
+                                                  'Must set ENV["DATABASE_URL"] if trying to initialize PostgresqlCrudDriver with no arguments')
+                   else
+                     raise ArgumentError, "Expected a String or Hash with connection creds or nil with DATABASE_URL set"
+                   end
+    end
+    # rubocop:enable Lint/MissingSuper
+
+    def open_connection
+      PG.connect(creds)
+    end
+
+    def connection_pool
+      @connection_pool ||= ConnectionPool.new(size: 5, timeout: 5) { open_connection }
+    end
+
+    def open_transaction
+      connection = connection_pool.checkout
+      tx = PgTransaction.new(connection)
+      connection.exec("BEGIN")
+      flush_transaction(tx)
+      tx
+    end
+
+    def flush_transaction(raw_tx)
+      raw_tx.connection.exec("SAVEPOINT foobara_crud_driver_revert_point")
+    end
+
+    def revert_transaction(raw_tx)
+      raw_tx.connection.exec("ROLLBACK TO foobara_crud_driver_revert_point")
+    end
+
+    def rollback_transaction(raw_tx)
+      raw_tx.connection.exec("ROLLBACK")
+      connection_pool.checkin
+    end
+
+    def commit_transaction(raw_tx)
+      raw_tx.connection.exec("COMMIT")
+      connection_pool.checkin
     end
 
     class Table < Persistence::EntityAttributesCrudDriver::Table
@@ -185,6 +222,11 @@ module Foobara
       end
 
       private
+
+      def raw_connection
+        # Feels so weird to grab the transaction this way, hmmm
+        entity_class.current_transaction.raw_tx.connection
+      end
 
       def normalize_attribute(attribute_name, value)
         pg_type = column_types[attribute_name.to_s]

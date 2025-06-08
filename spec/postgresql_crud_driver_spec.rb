@@ -1,9 +1,7 @@
 RSpec.describe Foobara::PostgresqlCrudDriver do
-  let(:crud_driver) { described_class.new }
-  let(:setup_connection) do
-    PG::Connection.new("postgres://#{db_user}:#{db_password}@localhost:5432/postgres")
-  end
-  let(:pg) { described_class.pg }
+  let(:crud_driver) { described_class.new(creds) }
+  let(:creds) { database_url }
+  let(:setup_connection) { PG::Connection.new(admin_database_url) }
   let(:db_name) { "foobara_test" }
   let(:db_user) { "testuser" }
   let(:db_password) { "testpassword" }
@@ -19,10 +17,9 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
     end
   end
   let(:skip_setting_up_database) { false }
-  let(:credentials) { nil }
-  let(:database_url) do
-    "postgres://#{db_user}:#{db_password}@localhost:5432/#{db_name}"
-  end
+  let(:database_url_without_db) { "postgres://#{db_user}:#{db_password}@localhost:5432" }
+  let(:admin_database_url) { "#{database_url_without_db}/postgres" }
+  let(:database_url) { "#{database_url_without_db}/#{db_name}" }
 
   def table
     entity_class.current_transaction_table.entity_attributes_crud_driver_table
@@ -30,77 +27,66 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
 
   after do
     unless skip_setting_up_database
-      pg.close
+      setup_connection.close
+      crud_driver.connection_pool.shutdown(&:close)
     end
+
     Foobara.reset_alls
-    described_class.reset_all
   end
 
   before do
     stub_env_var("DATABASE_URL", database_url)
 
     unless skip_setting_up_database
-      setup_connection.exec("DROP DATABASE IF EXISTS #{described_class.escape_identifier(db_name)}")
-      setup_connection.exec("CREATE DATABASE #{described_class.escape_identifier(db_name)}")
-      pg.exec("CREATE TABLE some_entity (
+      database = described_class.escape_identifier(db_name)
+      setup_connection.exec("DROP DATABASE IF EXISTS #{database}")
+      setup_connection.exec("CREATE DATABASE #{database}")
+      database_connection = PG.connect(database_url)
+      database_connection.exec("CREATE TABLE some_entity (
         id SERIAL PRIMARY KEY,
         foo INTEGER,
         bar TEXT,
         created_at TIMESTAMP
       );")
+      database_connection.close
 
-      Foobara::Persistence.default_crud_driver = described_class.new(credentials)
+      Foobara::Persistence.default_crud_driver = crud_driver
     end
   end
 
-  describe ".pg" do
+  describe "#initialize" do
     context "with no DATABASE_URL env var" do
       let(:skip_setting_up_database) { true }
-      let(:database_url) { nil }
+      let(:creds) { nil }
+
+      stub_env_var("DATABASE_URL", nil)
 
       it "raises" do
         expect {
-          described_class.pg
+          crud_driver
         }.to raise_error(described_class::NoDatabaseUrlError)
       end
     end
 
     context "with DATABASE_URL env var" do
       it "uses DATABASE_URL to connect" do
-        expect(pg).to be_a(PG::Connection)
+        connection = crud_driver.open_connection
+        expect(connection).to be_a(PG::Connection)
 
-        expect(pg.host).to eq("localhost")
-        expect(pg.port).to eq(5432)
-        expect(pg.db).to eq("foobara_test")
-        expect(pg.user).to eq("testuser")
-      end
-    end
-  end
-
-  describe "#initialize" do
-    context "with an existing connection" do
-      let(:existing_connection) { PG::Connection.new(database_url) }
-      let(:crud_driver) do
-        described_class.new(existing_connection)
-      end
-
-      after do
-        existing_connection.close
-      end
-
-      it "uses the existing connection" do
-        expect(crud_driver.raw_connection).to be(existing_connection)
+        expect(connection.host).to eq("localhost")
+        expect(connection.port).to eq(5432)
+        expect(connection.db).to eq("foobara_test")
+        expect(connection.user).to eq("testuser")
+        connection.close
       end
     end
 
     context "with a database url" do
-      let(:crud_driver) { described_class.new(database_url) }
-
-      after { crud_driver.raw_connection.close }
-
-      it "connects to the database" do
-        expect(crud_driver.raw_connection).to be_a(PG::Connection)
-        expect(crud_driver.raw_connection.host).to eq("localhost")
+      it "can open transactions" do
+        tx = crud_driver.open_transaction
+        expect(tx.connection).to be_a(PG::Connection)
+        expect(tx.connection.host).to eq("localhost")
+        crud_driver.commit_transaction(tx)
       end
     end
   end
@@ -210,6 +196,12 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
         expect(table.all(page_size: 10).to_a.size).to eq(111)
         expect(entity_class.all.first.foo).to eq(1)
       end
+    end
+  end
+
+  describe ".has_real_transactions?" do
+    it "is a boolean" do
+      expect([true, false]).to include(described_class.has_real_transactions?)
     end
   end
 end

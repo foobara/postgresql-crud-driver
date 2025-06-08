@@ -23,6 +23,7 @@ Gem::Specification.new do |spec|
     "CHANGELOG.md"
   ]
 
+  spec.add_dependency "connection_pool"
   spec.add_dependency "foobara", "~> 0.0.94"
   spec.add_dependency "pg"
 
