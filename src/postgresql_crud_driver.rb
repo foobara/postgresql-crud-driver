@@ -1,5 +1,3 @@
-require "connection_pool"
-
 module Foobara
   class PostgresqlCrudDriver < Persistence::EntityAttributesCrudDriver
     class NoDatabaseUrlError < StandardError; end
@@ -50,7 +48,7 @@ module Foobara
     end
 
     def connection_pool
-      @connection_pool ||= ConnectionPool.new(size: 5, timeout: 5) { open_connection }
+      @connection_pool ||= ConnectionPool.new(max_connections: 5) { open_connection }
     end
 
     def open_transaction
@@ -71,12 +69,12 @@ module Foobara
 
     def rollback_transaction(raw_tx)
       raw_tx.connection.exec("ROLLBACK")
-      connection_pool.checkin
+      connection_pool.checkin(raw_tx.connection)
     end
 
     def commit_transaction(raw_tx)
       raw_tx.connection.exec("COMMIT")
-      connection_pool.checkin
+      connection_pool.checkin(raw_tx.connection)
     end
 
     class Table < Persistence::EntityAttributesCrudDriver::Table

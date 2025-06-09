@@ -28,7 +28,7 @@ RSpec.describe Foobara::PostgresqlCrudDriver do
   after do
     unless skip_setting_up_database
       setup_connection.close
-      crud_driver.connection_pool.shutdown(&:close)
+      crud_driver.connection_pool.clear(&:close)
     end
 
     Foobara.reset_alls
