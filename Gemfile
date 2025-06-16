@@ -5,13 +5,15 @@ ruby Foobara::PostgresqlCrudDriverVersion::MINIMUM_RUBY_VERSION
 
 gemspec
 
+# gem "foobara", path: "../foobara"
+
 gem "foobara-dotenv-loader", "~> 0.0.1"
 
 gem "rake"
 
 group :development do
   gem "foob"
-  gem "foobara-rubocop-rules", "~> 0.0.1"
+  gem "foobara-rubocop-rules", ">= 1.0.0"
   gem "guard-rspec"
   gem "rubocop-rake"
   gem "rubocop-rspec"
@@ -26,6 +28,7 @@ group :development, :test do
 end
 
 group :test do
+  gem "foobara-crud-driver-spec-helpers", "~> 1.0.0" # , path: "../crud-driver-spec-helpers"
   gem "foobara-spec-helpers", "~> 0.0.1"
   gem "rspec"
   gem "rspec-its"
