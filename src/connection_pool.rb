@@ -17,7 +17,9 @@ module Foobara
 
         unless connection
           if in_use_connections.size >= max_connections
+            # :nocov:
             raise TooManyConnectionsError, "#{in_use_connections.size} connections in use, cannot allocate more."
+            # :nocov:
           end
 
           connection = connection_proc.call
