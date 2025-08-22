@@ -294,7 +294,7 @@ module Foobara
           [attribute_name, value]
         end
 
-        # TODO: don't do this?
+        # TODO: don't do this? Is this a higher-up responsibility?
         entity_class.attributes_type.process_value!(attributes)
       end
 

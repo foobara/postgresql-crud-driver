@@ -7,12 +7,11 @@ gemspec
 
 # gem "foobara", path: "../foobara"
 
-gem "foobara-dotenv-loader", "~> 0.0.1"
+gem "foobara-dotenv-loader", "< 2.0.0"
 
 gem "rake"
 
 group :development do
-  gem "foob"
   gem "foobara-rubocop-rules", ">= 1.0.0"
   gem "guard-rspec"
   gem "rubocop-rake"
@@ -28,8 +27,8 @@ group :development, :test do
 end
 
 group :test do
-  gem "foobara-crud-driver-spec-helpers", "~> 1.0.0" # , path: "../crud-driver-spec-helpers"
-  gem "foobara-spec-helpers", "~> 0.0.1"
+  gem "foobara-crud-driver-spec-helpers", "< 2.0.0" # , path: "../crud-driver-spec-helpers"
+  gem "foobara-spec-helpers", "< 2.0.0"
   gem "rspec"
   gem "rspec-its"
   gem "ruby-prof"

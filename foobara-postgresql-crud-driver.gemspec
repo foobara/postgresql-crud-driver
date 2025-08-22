@@ -23,7 +23,7 @@ Gem::Specification.new do |spec|
     "CHANGELOG.md"
   ]
 
-  spec.add_dependency "foobara", "~> 0.0.131"
+  spec.add_dependency "foobara", ">= 0.1.1", "< 2.0.0"
   spec.add_dependency "pg"
 
   spec.require_paths = ["lib"]
